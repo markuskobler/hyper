@@ -104,6 +104,33 @@ impl<B: AsRef<[u8]> + 'static> Http<B> {
         })
     }
 
+    /// Bind the provided `addr` and return a server ready to handle
+    /// connections.
+    ///
+    /// This method will bind the `addr` provided with a new TCP listener ready
+    /// to accept connections. Each connection will be processed with the
+    /// `new_service` object provided as well, creating a new service per
+    /// connection.
+    ///
+    /// The returned `Server` contains one method, `run`, which is used to
+    /// actually run the server.
+    pub fn bind_with<S, Bd>(&self, core: Core, addr: &SocketAddr, new_service: S) -> ::Result<Server<S, Bd>>
+        where S: NewService<Request = Request, Response = Response<Bd>, Error = ::Error> +
+                    Send + Sync + 'static,
+              Bd: Stream<Item=B, Error=::Error>,
+    {
+        let handle = core.handle();
+        let listener = try!(TcpListener::bind(addr, &handle));
+
+        Ok(Server {
+            new_service: new_service,
+            core: core,
+            listener: listener,
+            protocol: self.clone(),
+            shutdown_timeout: Duration::new(1, 0),
+        })
+    }
+
     /// Use this `Http` instance to create a new server task which handles the
     /// connection `io` provided.
     ///
